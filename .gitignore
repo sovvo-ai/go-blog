@@ -1,0 +1,57 @@
+# ---- 环境与凭据（绝不提交）----
+.env
+deploy/.env
+*.local.env
+.env.*
+!.env.example
+!deploy/.env.example
+
+# ---- 构建产物 ----
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ---- 测试与覆盖率 ----
+coverage.out
+coverage.html
+*.test
+*.prof
+
+# ---- 依赖与缓存 ----
+node_modules/
+.pnpm-store/
+vendor/
+
+# ---- 前端产物 ----
+apps/*/.nuxt/
+apps/*/.output/
+apps/*/dist/
+.nuxt/
+.output/
+
+# ---- 助手工作区数据（不属于项目代码）----
+.workbuddy/
+
+# ---- 编辑器与系统 ----
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- 本地上传目录（运行时产生，不入库）----
+var/
+storage/
+uploads/
+
+# ---- 备份产物（含数据库导出，绝不入库）----
+backups/
+
+# ---- 临时文件 ----
+*.log
+tmp/
+.cache/

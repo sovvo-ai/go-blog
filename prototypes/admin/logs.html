@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>操作日志 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a href="/admin/index.html">概览</a><a href="/admin/users.html">用户管理</a><a href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a href="/admin/settings.html">系统设置</a><a href="/admin/index-status.html">索引状态</a><a class="on" href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">操作日志</span><span class="crumb-sep">/</span> 审计记录</div>
+    <div class="admin-content">
+<div style="display:flex;gap:10px;margin-bottom:16px;">
+  <div class="admin-input" style="width:220px;">搜索动作 / 对象…</div>
+  <div class="admin-select">操作人：全部 ▾</div>
+</div>
+<div class="hairline-table">
+  <div class="thead" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+    <div style="padding:0 14px 0 4px;">时间</div><div>操作人</div><div>动作</div><div>对象</div><div>IP</div>
+  </div><div class="trow" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+  <div class="cell mono" style="font-size:12px;">2026-10-22 09:12</div><div class="cell">admin</div>
+  <div class="cell">article.approve</div><div class="cell">《Meilisearch 中文分词踩坑记录》</div><div class="cell mono" style="font-size:12px;">127.0.0.1</div>
+</div><div class="trow" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+  <div class="cell mono" style="font-size:12px;">2026-10-22 09:10</div><div class="cell">admin</div>
+  <div class="cell">user.set_status</div><div class="cell">禁用用户 阿赵（原因：刷屏）</div><div class="cell mono" style="font-size:12px;">127.0.0.1</div>
+</div><div class="trow" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+  <div class="cell mono" style="font-size:12px;">2026-10-21 18:40</div><div class="cell">admin</div>
+  <div class="cell">article.offline</div><div class="cell">《某广告文》（原因：垃圾广告）</div><div class="cell mono" style="font-size:12px;">127.0.0.1</div>
+</div><div class="trow" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+  <div class="cell mono" style="font-size:12px;">2026-10-21 18:38</div><div class="cell">admin</div>
+  <div class="cell">report.handle</div><div class="cell">举报 #12 驳回</div><div class="cell mono" style="font-size:12px;">127.0.0.1</div>
+</div><div class="trow" style="display:grid;grid-template-columns:150px 90px 150px minmax(0,1fr) 120px;">
+  <div class="cell mono" style="font-size:12px;">2026-10-21 17:02</div><div class="cell">admin</div>
+  <div class="cell">settings.update</div><div class="cell">关闭全站评论开关（10 分钟后恢复）</div><div class="cell mono" style="font-size:12px;">127.0.0.1</div>
+</div>
+</div>
+<p style="margin-top:12px;font-size:11px;color:var(--ink-4);">日志只增不改，保留 180 天。</p></div>
+  </div>
+</div>
+</body>
+</html>

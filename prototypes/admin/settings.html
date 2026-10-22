@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>系统设置 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a href="/admin/index.html">概览</a><a href="/admin/users.html">用户管理</a><a href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a class="on" href="/admin/settings.html">系统设置</a><a href="/admin/index-status.html">索引状态</a><a href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">系统设置</span><span class="crumb-sep">/</span> 站点参数</div>
+    <div class="admin-content">
+<div style="max-width:560px;">
+  <h1 style="font-family:var(--serif);font-size:18px;color:var(--ink);margin:0 0 18px;">站点信息</h1>
+  <div class="field"><label>站点名称</label><input type="text" value="墨痕"></div>
+  <div class="field"><label>站点描述</label><input type="text" value="记录 Go、数据库与系统设计的实践与复盘"></div>
+  <div class="field"><label>备案号</label><input type="text" value="沪ICP备2026xxxxx号"></div>
+  <h1 style="font-family:var(--serif);font-size:18px;color:var(--ink);margin:26px 0 18px;">功能开关</h1>
+  <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:26px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--hairline);padding-bottom:14px;">
+      <div><p style="margin:0;font-size:13px;color:var(--ink);">文章审核</p><p style="margin:2px 0 0;font-size:12px;color:var(--ink-4);">开启后文章需管理员通过才发布</p></div>
+      <span class="toggle on"><span class="track"></span></span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--hairline);padding-bottom:14px;">
+      <div><p style="margin:0;font-size:13px;color:var(--ink);">开放注册</p><p style="margin:2px 0 0;font-size:12px;color:var(--ink-4);">关闭后仅已有账号可登录</p></div>
+      <span class="toggle on"><span class="track"></span></span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--hairline);padding-bottom:14px;">
+      <div><p style="margin:0;font-size:13px;color:var(--ink);">评论开关（全站）</p><p style="margin:2px 0 0;font-size:12px;color:var(--ink-4);">关闭后所有文章不可评论，实时生效</p></div>
+      <span class="toggle"><span class="track"></span></span>
+    </div>
+  </div>
+  <button class="btn-dark" style="height:40px;padding:0 28px;">保存设置</button>
+  <p style="margin-top:12px;font-size:11px;color:var(--ink-4);">每次修改写入操作日志。</p>
+</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+/* 墨痕 · 全站共享样式（视觉稿版，正式版迁移 Nuxt 后由 tokens.css 接管） */
+:root {
+  --ink: #111827;
+  --ink-2: #374151;
+  --ink-3: #6B7280;
+  --ink-4: #9CA3AF;
+  --hairline: #E5E7EB;
+  --paper: #FFFFFF;
+  --paper-2: #F9FAFB;
+  --accent: #DC2626;
+  --green: #16A34A;
+  --amber: #D97706;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --sans: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink-2); background: var(--paper); font-size: 14px; }
+a { color: inherit; text-decoration: none; }
+.serif { font-family: var(--serif); }
+.mono { font-family: var(--mono); }
+.container { max-width: 1080px; margin: 0 auto; padding: 0 40px; }
+
+/* 顶栏 */
+.topbar { display: flex; align-items: baseline; gap: 24px; padding: 20px 40px 16px; border-bottom: 2px solid var(--ink); }
+.topbar .logo { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink); }
+.topbar nav { display: flex; gap: 18px; font-size: 13px; color: var(--ink-3); }
+.topbar nav a.active { color: var(--ink); font-weight: 500; border-bottom: 2px solid var(--ink); padding-bottom: 2px; }
+.topbar .right { margin-left: auto; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--ink-3); }
+.avatar-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* 按钮 */
+.btn-dark { background: var(--ink); color: #fff; font-size: 12px; border-radius: 2px; padding: 0 14px; height: 34px; display: inline-flex; align-items: center; cursor: pointer; border: none; }
+.btn-ghost { font-size: 13px; color: var(--ink-3); border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 8px 30px; display: inline-block; cursor: pointer; }
+
+/* 文章流 */
+.feed-item { padding: 20px 0; border-bottom: 0.5px solid var(--hairline); }
+.feed-meta { font-size: 12px; color: var(--ink-4); margin-bottom: 4px; }
+.feed-title { font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--ink); line-height: 1.5; margin-bottom: 8px; }
+.feed-title:hover { text-decoration: underline; text-underline-offset: 4px; }
+.feed-summary { font-size: 13px; color: var(--ink-3); line-height: 1.8; }
+.thumb { width: 128px; height: 86px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 0.5px solid var(--hairline); }
+.tag-chip { display: inline-block; font-size: 11px; border: 0.5px solid var(--hairline); border-radius: 999px; padding: 2px 10px; color: var(--ink-3); margin-right: 4px; }
+
+/* 状态 chip（管理端） */
+.chip { display: inline-block; font-size: 12px; border-radius: 2px; padding: 2px 9px; border: 0.5px solid; }
+.chip-green { color: var(--green); border-color: #BBF7D0; }
+.chip-amber { color: var(--amber); border-color: #FDE68A; }
+.chip-gray { color: var(--ink-3); border-color: #D3D1C7; }
+.chip-draft { color: var(--ink-2); border: 1px dashed #D3D1C7; }
+.link-u { color: var(--ink); border-bottom: 0.5px solid var(--ink); cursor: pointer; }
+.link-muted { color: var(--ink-4); }

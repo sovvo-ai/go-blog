@@ -1,0 +1,12 @@
+# 构建上下文只需要源码与依赖清单，避免把本地产物塞进镜像
+node_modules
+.nuxt
+.output
+.nitro
+.cache
+dist
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store

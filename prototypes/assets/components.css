@@ -1,0 +1,78 @@
+/* 墨痕 · 扩展组件（工作台/表单/编辑器/错误页等） */
+
+/* 工作台布局（个人中心） */
+.ws-layout { display: flex; min-height: 70vh; }
+.ws-menu { width: 200px; flex-shrink: 0; border-right: 0.5px solid var(--hairline); padding: 20px 12px; }
+.ws-menu .who { text-align: center; padding: 8px 0 20px; }
+.ws-menu .who .avatar-dot { margin: 0 auto 10px; width: 56px; height: 56px; font-size: 20px; }
+.ws-menu .who .n { font-family: var(--serif); font-size: 15px; color: var(--ink); margin: 0 0 2px; }
+.ws-menu .who .r { font-size: 11px; color: var(--ink-4); margin: 0; }
+.ws-menu nav { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.ws-menu nav a { color: var(--ink-2); padding: 9px 12px; border-radius: 2px; }
+.ws-menu nav a.on { background: var(--ink); color: #fff; }
+.ws-content { flex: 1; min-width: 0; padding: 28px 36px; }
+.ws-content h1 { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); margin: 0 0 20px; }
+
+/* 表单 */
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 12px; color: var(--ink-3); margin-bottom: 6px; }
+.field input[type="text"], .field input[type="email"], .field input[type="password"], .field textarea, .field select {
+  width: 100%; height: 40px; border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 0 12px;
+  font-size: 14px; color: var(--ink); background: var(--paper); font-family: var(--sans);
+}
+.field textarea { height: auto; padding: 10px 12px; line-height: 1.7; }
+.field .hint { font-size: 12px; color: var(--ink-4); margin-top: 6px; }
+
+/* 认证页（全屏布局） */
+.auth-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--paper); padding: 40px 20px; }
+.auth-card { width: 380px; max-width: 100%; }
+.auth-card .logo { font-family: var(--serif); font-size: 24px; color: var(--ink); text-align: center; margin-bottom: 8px; }
+.auth-card .sub { font-size: 12px; color: var(--ink-4); text-align: center; margin-bottom: 28px; }
+.auth-card h1 { font-family: var(--serif); font-size: 20px; color: var(--ink); margin: 0 0 22px; }
+.auth-card .alt { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 18px; }
+.auth-card .alt a { color: var(--ink); border-bottom: 0.5px solid var(--ink); }
+.btn-wide { width: 100%; height: 42px; background: var(--ink); color: #fff; border: none; border-radius: 2px; font-size: 14px; cursor: pointer; }
+.btn-ghost-sm { display: inline-block; font-size: 12px; color: var(--ink-3); border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 6px 16px; cursor: pointer; }
+
+/* 错误页 */
+.error-page { min-height: 80vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.error-page .code { font-family: var(--mono); font-size: 72px; color: var(--ink); line-height: 1; }
+.error-page .msg { font-family: var(--serif); font-size: 18px; color: var(--ink-2); margin: 16px 0 6px; }
+.error-page .sub { font-size: 13px; color: var(--ink-4); margin-bottom: 28px; }
+
+/* 作者主页头部 */
+.user-head { display: flex; align-items: center; gap: 18px; padding: 32px 0; border-bottom: 2px solid var(--ink); }
+.user-head .ava-big { width: 72px; height: 72px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; }
+.user-head h1 { font-family: var(--serif); font-size: 24px; color: var(--ink); margin: 0 0 4px; }
+.user-head .bio { font-size: 13px; color: var(--ink-3); margin: 0 0 6px; }
+.user-head .meta { font-size: 12px; color: var(--ink-4); margin: 0; }
+.user-head .ops { margin-left: auto; display: flex; gap: 10px; }
+
+/* 编辑器 */
+.editor-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 24px; }
+.editor-area textarea { width: 100%; min-height: 480px; border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 16px 18px; font-family: var(--serif); font-size: 15px; line-height: 1.9; color: var(--ink); resize: vertical; }
+.editor-title input { width: 100%; border: none; outline: none; font-family: var(--serif); font-size: 26px; font-weight: 500; color: var(--ink); padding: 8px 0; border-bottom: 0.5px solid var(--hairline); margin-bottom: 16px; }
+.settings-panel { border: 0.5px solid var(--hairline); padding: 20px; height: fit-content; position: sticky; top: 20px; }
+.settings-panel h4 { font-size: 12px; letter-spacing: 2px; color: var(--ink); font-weight: 500; margin: 0 0 14px; }
+
+/* 开关 */
+.toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.toggle .track { width: 36px; height: 20px; border-radius: 999px; background: #D3D1C7; position: relative; }
+.toggle .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.toggle.on .track { background: var(--ink); }
+.toggle.on .track::after { left: 18px; }
+
+/* 媒体库网格 */
+.media-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.media-grid .m { border: 0.5px solid var(--hairline); }
+.media-grid .img { height: 110px; display: flex; align-items: center; justify-content: center; }
+.media-grid .meta { padding: 8px 10px; font-size: 11px; color: var(--ink-3); line-height: 1.6; }
+.media-grid .meta .t { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 通知 */
+.notif { display: flex; gap: 12px; padding: 16px 4px; border-bottom: 0.5px solid var(--hairline); font-size: 13px; }
+.notif .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+.notif .dot.read { background: #D3D1C7; }
+.notif .n-title { color: var(--ink); margin: 0 0 2px; font-weight: 500; }
+.notif .n-body { color: var(--ink-3); margin: 0 0 3px; }
+.notif .n-time { color: var(--ink-4); font-size: 12px; margin: 0; }

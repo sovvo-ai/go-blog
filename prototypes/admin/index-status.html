@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>索引状态 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a href="/admin/index.html">概览</a><a href="/admin/users.html">用户管理</a><a href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a href="/admin/settings.html">系统设置</a><a class="on" href="/admin/index-status.html">索引状态</a><a href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">索引状态</span><span class="crumb-sep">/</span> Meilisearch 同步</div>
+    <div class="admin-content">
+<div class="stat-band" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+  <div class="cell"><p class="label">索引文档数</p><p class="num">126</p><p class="delta">库内文章 128 · 差 2</p></div>
+  <div class="cell warn"><p class="label">同步失败</p><p class="num">2</p><p class="delta">1 自动重试 · 1 待人工</p></div>
+  <div class="cell"><p class="label">最近全量重建</p><p class="num" style="font-size:16px;font-family:var(--serif);">10-21 23:00</p><p class="delta">耗时 41 秒</p></div>
+</div>
+<div style="display:flex;align-items:center;margin-bottom:14px;">
+  <span style="font-family:var(--serif);font-size:14px;color:var(--ink);">同步失败队列</span>
+  <span class="btn-dark" style="margin-left:auto;height:34px;padding:0 18px;">全部重试</span>
+</div>
+<div class="hairline-table">
+  <div class="thead" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 200px 110px;">
+    <div style="padding:0 14px 0 4px;">文章 Slug</div><div>最近错误</div><div>状态</div><div style="text-align:right;padding-right:4px;">操作</div>
+  </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 200px 110px;">
+  <div class="cell-title">meilisearch-sync</div><div class="cell">网络超时（ETIMEDOUT）×3</div>
+  <div class="cell">自动重试中 · 下次 2 分钟后</div>
+  <div class="ops"><span class="link-u">立即重试</span></div>
+</div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 200px 110px;">
+  <div class="cell-title">spec-first-practice</div><div class="cell">文档体积超限（>2MB）</div>
+  <div class="cell">需人工处理</div>
+  <div class="ops"><span class="link-u">立即重试</span></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:22px;border:0.5px solid var(--hairline);padding:16px;">
+  <div style="flex:1;">
+    <p style="margin:0;font-family:var(--serif);font-size:14px;color:var(--ink);">全量重建</p>
+    <p style="margin:4px 0 0;font-size:12px;color:var(--ink-4);">清空索引后从数据库重新推送全部已发布文章，期间搜索结果短暂不完整。</p>
+  </div>
+  <span class="btn-ghost-sm" style="color:#DC2626;border-color:#DC2626;">执行重建…</span>
+</div></div>
+  </div>
+</div>
+</body>
+</html>

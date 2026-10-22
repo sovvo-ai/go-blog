@@ -1,0 +1,26 @@
+# 构建上下文排除清单
+# 凭据文件绝不能进入镜像层
+
+.env
+deploy/.env
+*.local.env
+!.env.example
+
+.git
+.gitignore
+.workbuddy
+.idea
+.vscode
+
+bin/
+var/
+storage/
+dist/
+coverage.out
+*.log
+
+apps/
+docs/
+*.md
+
+# 迁移脚本需要进入镜像（部署时执行），不要排除 migrations/

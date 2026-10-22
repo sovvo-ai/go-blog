@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用户管理 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a href="/admin/index.html">概览</a><a class="on" href="/admin/users.html">用户管理</a><a href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a href="/admin/settings.html">系统设置</a><a href="/admin/index-status.html">索引状态</a><a href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">用户管理</span><span class="crumb-sep">/</span> 全部用户</div>
+    <div class="admin-content">
+<div style="display:flex;gap:10px;margin-bottom:16px;">
+  <div class="admin-input" style="width:220px;">搜索用户名 / 邮箱…</div>
+  <div class="admin-select">角色：全部 ▾</div><div class="admin-select">状态：全部 ▾</div>
+  <span style="margin-left:auto;font-size:12px;color:var(--ink-3);align-self:center;">共 56 人</span>
+</div>
+<div class="hairline-table">
+  <div class="thead" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 120px 130px;">
+    <div style="padding:0 14px 0 4px;">用户</div><div>邮箱</div><div>角色</div><div>状态</div><div>注册时间</div><div style="text-align:right;padding-right:4px;">操作</div>
+  </div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 120px 130px;">
+  <div class="cell-title">阿张 liu**</div><div class="cell" style="font-family:var(--mono);font-size:12px;">zhang***@test.local</div>
+  <div class="cell">作者</div><div><span class="chip chip-green">正常</span></div><div class="cell">2026-08-02</div>
+  <div class="ops"><span class="link-u">禁用</span><span class="link-u">角色</span></div>
+</div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 120px 130px;">
+  <div class="cell-title">阿李 li**</div><div class="cell" style="font-family:var(--mono);font-size:12px;">li***@test.local</div>
+  <div class="cell">作者</div><div><span class="chip chip-green">正常</span></div><div class="cell">2026-08-11</div>
+  <div class="ops"><span class="link-u">禁用</span><span class="link-u">角色</span></div>
+</div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 120px 130px;">
+  <div class="cell-title">阿王 wa**</div><div class="cell" style="font-family:var(--mono);font-size:12px;">wang***@test.local</div>
+  <div class="cell">读者</div><div><span class="chip chip-green">正常</span></div><div class="cell">2026-09-01</div>
+  <div class="ops"><span class="link-u">禁用</span><span class="link-u">角色</span></div>
+</div><div class="trow" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 120px 130px;">
+  <div class="cell-title">阿赵 zh**</div><div class="cell" style="font-family:var(--mono);font-size:12px;">zhao***@test.local</div>
+  <div class="cell">读者</div><div><span class="chip chip-gray">已禁用</span></div><div class="cell">2026-09-14</div>
+  <div class="ops"><span class="link-u">启用</span><span class="link-u">角色</span></div>
+</div>
+</div>
+<p style="margin-top:12px;font-size:11px;color:var(--ink-4);">不能禁用自己；不能撤销最后一个管理员；禁用后令牌吊销并踢下线。</p></div>
+  </div>
+</div>
+</body>
+</html>

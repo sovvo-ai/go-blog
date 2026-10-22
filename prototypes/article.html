@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>单聊消息序号：为什么不用 Redis INCR · 墨痕</title>
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+.layout { display: grid; grid-template-columns: 200px minmax(0,1fr); gap: 40px; padding: 32px 40px; }
+.toc { border-left: 0.5px solid var(--hairline); padding-left: 20px; height: fit-content; position: sticky; top: 20px; }
+.toc h5 { font-size: 11px; color: var(--ink-4); letter-spacing: 2px; margin: 0 0 12px; font-weight: 500; }
+.toc a { display: block; font-size: 12px; line-height: 1.6; color: var(--ink-3); margin-bottom: 9px; }
+.toc a.on { color: var(--ink); font-weight: 500; border-left: 2px solid var(--ink); padding-left: 10px; margin-left: -12px; }
+.article { min-width: 0; }
+.article h1 { font-family: var(--serif); font-size: 30px; font-weight: 500; color: var(--ink); line-height: 1.4; margin: 0 0 14px; }
+.author-bar { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 0.5px solid var(--hairline); border-bottom: 0.5px solid var(--hairline); margin-bottom: 24px; }
+.author-bar .name { font-size: 13px; font-weight: 500; color: var(--ink); margin: 0; }
+.author-bar .bio { font-size: 12px; color: var(--ink-4); margin: 0; }
+.author-bar .follow { margin-left: auto; font-size: 12px; color: var(--ink-3); border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 5px 14px; }
+.prose { font-size: 16px; color: var(--ink-2); line-height: 1.9; }
+.prose h2 { font-family: var(--serif); font-size: 17px; color: var(--ink); margin: 0 0 18px; }
+.prose p { margin: 0 0 18px; }
+.prose code { font-family: var(--mono); font-size: 14px; background: var(--paper-2); border: 0.5px solid var(--hairline); border-radius: 3px; padding: 1px 6px; }
+.prose pre { background: var(--paper-2); border: 0.5px solid var(--hairline); border-radius: 4px; padding: 14px 18px; margin: 0 0 18px; font-family: var(--mono); font-size: 13px; color: var(--ink-2); line-height: 1.8; overflow-x: auto; }
+.prose blockquote { border-left: 3px solid var(--ink); padding: 2px 0 2px 16px; margin: 0 0 18px; color: var(--ink-3); }
+.actions { display: flex; gap: 12px; padding: 18px 0; border-top: 0.5px solid var(--hairline); border-bottom: 0.5px solid var(--hairline); margin: 28px 0; }
+.actions span { font-size: 13px; color: var(--ink); border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 7px 20px; cursor: pointer; }
+.comments h3 { font-size: 15px; font-weight: 500; color: var(--ink); margin: 0 0 16px; }
+.comment { display: flex; gap: 12px; padding: 16px 0; border-bottom: 0.5px solid #F3F4F6; }
+.comment .meta { font-size: 12px; color: var(--ink-4); margin: 0 0 4px; }
+.comment .text { font-size: 14px; color: var(--ink-2); line-height: 1.7; margin: 0 0 6px; }
+.comment .reply { font-size: 12px; color: var(--ink-4); margin: 0; }
+.comment-box { margin-top: 20px; border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 12px 14px; font-size: 13px; color: var(--ink-4); }
+.site-footer { padding: 14px 40px; border-top: 2px solid var(--ink); font-size: 12px; color: var(--ink-4); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="logo">墨痕</span>
+  <nav><a href="/">首页</a><a href="#">分类</a><a href="#">标签</a><a href="/messages.html">消息</a></nav>
+  <div class="right"><div class="avatar-dot">李</div></div>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <h5>目录</h5>
+    <a class="on" href="#">一、问题：乱序从哪来</a>
+    <a href="#">二、四种候选方案</a>
+    <a href="#">三、行锁内原子分配</a>
+    <a href="#">四、边界情况推演</a>
+    <a href="#">五、压测数据</a>
+    <h5 style="margin-top:24px;">本文标签</h5>
+    <div><span class="tag-chip">架构</span><span class="tag-chip">MySQL</span><span class="tag-chip">Go</span></div>
+  </aside>
+
+  <main class="article">
+    <p class="feed-meta">架构 · 2026-10-21 · 阅读 3.4k</p>
+    <h1>单聊消息序号：为什么不用 Redis INCR</h1>
+    <div class="author-bar">
+      <div class="avatar-dot" style="width:32px;height:32px;font-size:12px;">张</div>
+      <div><p class="name">阿张</p><p class="bio">后端工程师 · 32 篇文章</p></div>
+      <span class="follow">+ 关注（V1.1）</span>
+    </div>
+
+    <div class="prose">
+      <p>单聊的 <code>messages.id</code> 是全局自增，多实例并发写入时，事务提交顺序与 id 顺序可能不一致——客户端会看到乱序。会话内需要一个严格单调的 <code>seq</code>。</p>
+      <h2>解法：把序号分配塞进行锁</h2>
+      <pre>UPDATE conversations
+   SET seq_counter = LAST_INSERT_ID(seq_counter + 1)
+ WHERE id = ?;
+
+SELECT LAST_INSERT_ID();</pre>
+      <blockquote>整个过程在一条 UPDATE 的行锁内完成，应用层不需要分布式锁，Redis 重启也不影响。</blockquote>
+      <p><code>LAST_INSERT_ID(expr)</code> 是 MySQL 内置能力：执行后把 expr 记录为当前连接的 last_insert_id，随后取回。事务失败时 seq_counter 随事务回滚，不产生空洞。</p>
+      <p>并发发送的实测结果：10 路并发、重复 100 次，seq 始终为 1..10 连续无空洞。</p>
+    </div>
+
+    <div class="actions">
+      <span>♥ 赞 182</span><span>☆ 收藏 96</span><span style="color:var(--ink-3);">举报</span>
+    </div>
+
+    <section class="comments">
+      <h3>评论 3</h3>
+      <div class="comment">
+        <div class="avatar-dot" style="background:#D3D1C7;">王</div>
+        <div style="min-width:0;flex:1;">
+          <p class="meta">阿王 · 昨天</p>
+          <p class="text">LAST_INSERT_ID 这个用法第一次见，长知识了。多会话并发时行锁会不会成瓶颈？</p>
+          <p class="reply">回复</p>
+        </div>
+      </div>
+      <div class="comment">
+        <div class="avatar-dot">张</div>
+        <div style="min-width:0;flex:1;">
+          <p class="meta">阿张（作者） · 昨天</p>
+          <p class="text">单会话写入以秒计，远没到瓶颈；真到那天换分段预取就行，文末有推演。</p>
+        </div>
+      </div>
+      <div class="comment-box">写下你的评论…</div>
+    </section>
+  </main>
+</div>
+
+<footer class="site-footer">© 2026 墨痕 · 备案号占位</footer>
+</body>
+</html>

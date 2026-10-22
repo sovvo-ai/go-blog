@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文章审核 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/admin.css">
+<style>
+.filters { display: flex; gap: 10px; margin-bottom: 16px; }
+.filters .count { margin-left: auto; font-size: 12px; color: var(--ink-3); align-self: center; }
+.cols { display: grid; grid-template-columns: minmax(0,1fr) 80px 80px 96px 110px 140px; }
+.trow.warn-bg { background: #FFFBEB; }
+.trow .num-sub { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav>
+      <a href="/admin/">概览</a>
+      <a href="#">用户管理</a>
+      <a class="on" href="/admin/articles.html">文章审核</a>
+      <a href="#">评论管理</a>
+      <a href="#">举报处理 <span style="background:#DC2626;color:#fff;font-size:10px;border-radius:8px;padding:1px 6px;margin-left:4px;">3</span></a>
+      <a href="#">分类 / 标签</a>
+      <a href="#">媒体库</a>
+      <a href="#">系统设置</a>
+      <a href="#">操作日志</a>
+    </nav>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page">文章审核</span><span class="crumb-sep">/</span>全站文章</div>
+    <div class="admin-content">
+      <div class="filters">
+        <div class="admin-input" style="width:220px;">搜索标题 / slug…</div>
+        <div class="admin-select">状态：全部 <span style="color:var(--ink-4);">▾</span></div>
+        <div class="admin-select">作者：全部 <span style="color:var(--ink-4);">▾</span></div>
+        <span class="count">共 128 条</span>
+      </div>
+
+      <div class="hairline-table">
+        <div class="thead cols">
+          <div style="padding:0 14px 0 4px;">标题</div><div>作者</div><div>分类</div><div>状态</div><div>数据</div><div style="text-align:right;padding-right:4px;">操作</div>
+        </div>
+        <div class="trow cols">
+          <div class="cell-title">单聊消息序号：为什么不用 Redis INCR</div>
+          <div class="cell">阿张</div><div class="cell">架构</div>
+          <div><span class="chip chip-green">已发布</span></div>
+          <div class="cell num-sub">3.4k 阅读 · 182 赞</div>
+          <div class="ops"><span class="link-u">下架</span><span class="link-u">删除</span><span class="link-dim">日志</span></div>
+        </div>
+        <div class="trow cols warn-bg">
+          <div class="cell-title">Meilisearch 中文分词踩坑记录</div>
+          <div class="cell">阿李</div><div class="cell">检索</div>
+          <div><span class="chip chip-amber">待审核</span></div>
+          <div class="cell">—</div>
+          <div class="ops"><span class="link-u">通过</span><span class="link-u">拒绝</span><span class="link-dim">详情</span></div>
+        </div>
+        <div class="trow cols">
+          <div class="cell-title">Go 1.26 泛型性能实测：切片排序快了 40%？</div>
+          <div class="cell">阿张</div><div class="cell">后端</div>
+          <div><span class="chip chip-green">已发布</span></div>
+          <div class="cell num-sub">1.2k 阅读 · 46 赞</div>
+          <div class="ops"><span class="link-u">下架</span><span class="link-u">删除</span><span class="link-dim">日志</span></div>
+        </div>
+        <div class="trow cols">
+          <div class="cell-title">为什么把消息序号从 Redis 迁回 MySQL</div>
+          <div class="cell">阿王</div><div class="cell">架构</div>
+          <div><span class="chip chip-gray">已下架</span></div>
+          <div class="cell num-sub">812 阅读 · 19 赞</div>
+          <div class="ops"><span class="link-u">上架</span><span class="link-u">删除</span><span class="link-dim">日志</span></div>
+        </div>
+        <div class="trow cols">
+          <div class="cell-title">我的文章工作流草稿</div>
+          <div class="cell">阿李</div><div class="cell">—</div>
+          <div><span class="chip chip-draft">草稿</span></div>
+          <div class="cell">—</div>
+          <div class="ops"><span class="link-dim">详情</span><span class="link-u">删除</span></div>
+        </div>
+      </div>
+
+      <div class="pager">
+        <span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>›</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

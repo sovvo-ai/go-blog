@@ -1,0 +1,3488 @@
+openapi: 3.0.3
+
+info:
+  title: Blog API
+  version: 1.0.0
+  description: |
+    企业级博客系统 V1.0 接口契约。
+
+    本文件是唯一契约来源，由 `oapi-codegen` 生成 Go DTO 类型，
+    由 `openapi-typescript` 生成前端 TS 类型。
+
+    **当前范围**：认证（8）+ 用户（5），对应开发阶段 2。
+    文章、互动、聊天、管理端接口在后续阶段按需补充，
+    补充时保持与 API_SPEC.md 一致。
+
+    **约定**
+    - 所有 ID 以字符串返回，避免 JS 精度丢失
+    - 时间格式为 RFC3339 UTC
+    - 成功响应统一包裹 `{code, message, data, request_id}`
+    - 204 响应无 body
+    - 认证依赖 HttpOnly Cookie，不使用 Authorization 头
+    - 写请求需携带 `X-CSRF-Token`
+
+servers:
+  - url: /api/v1
+    description: 同域反向代理（Nginx）
+
+tags:
+  - name: auth
+    description: 注册、验证、登录、令牌刷新、密码找回
+  - name: user
+    description: 当前用户资料与公开主页
+
+security:
+  - cookieAuth: []
+
+paths:
+  # ==========================================================
+  # 认证
+  # ==========================================================
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: 注册
+      description: |
+        创建账号后状态为 `pending_verify`，**不签发任何 Token**。
+        立即发送验证邮件，链接 24 小时有效。
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/verify-email:
+    get:
+      tags: [auth]
+      summary: 验证邮箱
+      description: 一次性消费，成功后状态变为 `active`。
+      operationId: verifyEmail
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 验证成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/resend-verify:
+    post:
+      tags: [auth]
+      summary: 重发验证邮件
+      description: |
+        无论邮箱是否存在、是否已验证，统一返回相同文案，避免邮箱枚举。
+      operationId: resendVerify
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailOnlyRequest'
+      responses:
+        '200':
+          description: 已受理（不代表邮箱一定存在）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 登录
+      description: |
+        成功后通过 Set-Cookie 下发 `access_token`、`refresh_token`、`csrf_token`。
+
+        - `pending_verify` 返回 20004，**不设置任何 Cookie**
+        - `disabled` 返回 20005
+        - 密码错误与账号不存在返回同一错误 20003
+        - 连续失败 5 次锁定 15 分钟（20006）
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          headers:
+            Set-Cookie:
+              description: 三个 Cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: 刷新令牌
+      description: |
+        从 `refresh_token` Cookie 读取凭证，轮换后覆盖三个 Cookie。
+
+        并发刷新时，第二个请求可能返回 401（交接窗口默认关闭），
+        客户端应重试一次。
+      operationId: refreshToken
+      security: []
+      responses:
+        '200':
+          description: 刷新成功
+          headers:
+            Set-Cookie:
+              description: 三个 Cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: 退出登录
+      description: 吊销当前设备所属 family，不影响其他设备。
+      operationId: logout
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已退出，并清除 Cookie
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      summary: 申请重置密码
+      description: |
+        统一返回相同文案，不泄露邮箱是否存在。
+
+        `pending_verify` 用户调用时，实际执行"重发验证邮件"，不生成重置令牌。
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailOnlyRequest'
+      responses:
+        '200':
+          description: 已受理
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      summary: 重置密码
+      description: |
+        令牌一次性消费。成功后吊销该用户全部 Refresh Token，
+        所有设备需重新登录。
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: 重置成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ==========================================================
+  # 用户
+  # ==========================================================
+  /users/me:
+    get:
+      tags: [user]
+      summary: 当前用户信息
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [user]
+      summary: 更新个人资料
+      description: 仅允许修改昵称与简介，用户名与邮箱不可改。
+      operationId: updateProfile
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/me/password:
+    put:
+      tags: [user]
+      summary: 修改密码
+      description: 成功后吊销全部 Refresh Token，清空 Cookie。
+      operationId: changePassword
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: 修改成功
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/me/avatar:
+    put:
+      tags: [user]
+      summary: 更新头像
+      description: 服务端生成 64/128/256 三档，返回 256 档 URL。
+      operationId: updateAvatar
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /users/{id}:
+    get:
+      tags: [user]
+      summary: 用户公开主页
+      description: 不返回 email、status、last_login_* 等敏感字段。
+      operationId: getPublicUser
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "1001"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ==========================================================
+# 组件
+# ==========================================================
+  /categories:
+    get:
+      tags: [article]
+      summary: 分类列表
+      description: 不含"未分类"虚拟项，category_id=0 由前端自行表示。
+      operationId: listCategories
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryListResponse' }
+
+  /tags:
+    get:
+      tags: [article]
+      summary: 标签列表
+      description: 按文章数倒序，最多 100 个。
+      operationId: listTags
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TagListResponse' }
+
+  /articles:
+    get:
+      tags: [article]
+      summary: 公开文章列表
+      description: |
+        只返回 status=published 且未删除的文章，列表项不含正文。
+        sort=hot 走数据库直查（近 30 天浏览量），不经过搜索引擎。
+      operationId: listArticles
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [latest, hot], default: latest }
+        - name: category_id
+          in: query
+          description: 传 "0" 表示未分类
+          schema: { type: string }
+        - name: tag_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleListResponse' }
+    post:
+      tags: [article]
+      summary: 创建草稿
+      operationId: createArticle
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateArticleRequest' }
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /articles/{id}:
+    get:
+      tags: [article]
+      summary: 文章详情
+      description: |
+        key 为 slug 或纯数字 ID。非公开状态对非作者一律 404（不泄露存在性），
+        已删除返回 410。不返回 content_md，编辑请用 /articles/{id}/edit。
+      operationId: getArticle
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleDetailResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410':
+          description: 文章已删除
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [article]
+      summary: 更新文章
+      description: 仅作者本人可改；必须携带 version 做乐观锁。
+      operationId: updateArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateArticleRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleMutationResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [article]
+      summary: 删除文章
+      description: 软删除；公开 URL 之后返回 410。
+      operationId: deleteArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /search:
+    get:
+      tags: [article]
+      summary: 全文检索
+      description: |
+        偏移分页（全站唯一例外，见 API_SPEC 1.6.2）：Meilisearch 仅支持 offset/limit，
+        page × page_size 超过 1000 返回 400。
+        检索服务不可用时返回 200 + 空结果 + degraded=true，不返回 5xx。
+      operationId: searchArticles
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: 成功（检索服务降级时同样返回 200）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /articles/{id}/edit:
+    get:
+      tags: [article]
+      summary: 取正文供编辑
+      description: 仅作者本人可调用；管理员也返回 403。
+      operationId: getArticleForEdit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleEditResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /articles/{id}/submit:
+    post:
+      tags: [article]
+      summary: 提交（发布或送审）
+      description: 审核关闭直接 published，开启则进入 pending。
+      operationId: submitArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleStatusResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /articles/{id}/withdraw:
+    post:
+      tags: [article]
+      summary: 撤回审核
+      operationId: withdrawArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleStatusResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /articles/{id}/archive:
+    post:
+      tags: [article]
+      summary: 归档
+      operationId: archiveArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleStatusResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /articles/{id}/restore:
+    post:
+      tags: [article]
+      summary: 恢复为草稿
+      operationId: restoreArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleStatusResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /articles/{id}/like:
+    post:
+      tags: [interaction]
+      summary: 点赞
+      operationId: likeArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LikeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [interaction]
+      summary: 取消点赞
+      operationId: unlikeArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LikeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /articles/{id}/favorite:
+    post:
+      tags: [interaction]
+      summary: 收藏
+      operationId: favoriteArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FavoriteResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [interaction]
+      summary: 取消收藏
+      operationId: unfavoriteArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FavoriteResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /articles/{id}/comments:
+    get:
+      tags: [interaction]
+      summary: 评论列表
+      operationId: listComments
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: root_id
+          in: query
+          description: 只取某主楼下的回复
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentListResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [interaction]
+      summary: 发表评论
+      operationId: createComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCommentRequest' }
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /comments/{id}:
+    delete:
+      tags: [interaction]
+      summary: 删除评论
+      operationId: deleteComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports:
+    post:
+      tags: [interaction]
+      summary: 举报
+      operationId: createReport
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportRequest' }
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/favorites:
+    get:
+      tags: [interaction]
+      summary: 我的收藏
+      operationId: listMyFavorites
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FavoriteListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications:
+    get:
+      tags: [notification]
+      summary: 通知列表
+      operationId: listNotifications
+      parameters:
+        - name: unread_only
+          in: query
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/unread-count:
+    get:
+      tags: [notification]
+      summary: 未读通知数
+      operationId: notificationUnreadCount
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnreadCountResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/read-all:
+    put:
+      tags: [notification]
+      summary: 标记全部已读
+      operationId: markAllNotificationsRead
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功，返回更新的条数
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationReadAllResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/{id}/read:
+    put:
+      tags: [notification]
+      summary: 标记已读
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已标记
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/me/articles:
+    get:
+      tags: [article]
+      summary: 我的文章
+      description: 返回当前用户全部状态的文章，含草稿、待审、被拒、下架。
+      operationId: listMyArticles
+      parameters:
+        - name: status
+          in: query
+          description: 多值用逗号分隔，如 draft,pending
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyArticleListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /admin/overview:
+    get:
+      tags: [admin]
+      summary: 概览统计
+      operationId: adminOverview
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOverviewResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users:
+    get:
+      tags: [admin]
+      summary: 用户列表
+      operationId: adminListUsers
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users/{id}/status:
+    put:
+      tags: [admin]
+      summary: 禁用或启用用户
+      operationId: adminUpdateUserStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserStatusRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/users/{id}/role:
+    put:
+      tags: [admin]
+      summary: 调整用户角色
+      operationId: adminUpdateUserRole
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserRoleRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/articles:
+    get:
+      tags: [admin]
+      summary: 全站文章列表
+      operationId: adminListArticles
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: author_id
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/articles/{id}:
+    get:
+      tags: [admin]
+      summary: 文章详情（管理端）
+      description: |
+        任意状态均可读（含已删除），返回正文原文与理由字段。
+        已删除文章返回 deleted_at，供后台记录页展示（PRD 2.2.1）。
+      operationId: adminArticleDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleDetailResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    delete:
+      tags: [admin]
+      summary: 删除文章
+      operationId: adminDeleteArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/articles/{id}/approve:
+    post:
+      tags: [admin]
+      summary: 审核通过
+      operationId: adminApproveArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleStatusResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/articles/{id}/reject:
+    post:
+      tags: [admin]
+      summary: 审核拒绝
+      operationId: adminRejectArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminArticleReasonRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleStatusResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/articles/{id}/offline:
+    post:
+      tags: [admin]
+      summary: 下架
+      operationId: adminOfflineArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminArticleReasonRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleStatusResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/articles/{id}/relist:
+    post:
+      tags: [admin]
+      summary: 重新上架
+      operationId: adminRelistArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticleStatusResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/comments:
+    get:
+      tags: [admin]
+      summary: 评论列表（管理端）
+      operationId: adminListComments
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: article_id
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminCommentListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/comments/{id}/approve:
+    post:
+      tags: [admin]
+      summary: 评论审核通过
+      operationId: adminApproveComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/comments/{id}/reject:
+    post:
+      tags: [admin]
+      summary: 评论审核拒绝
+      operationId: adminRejectComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/comments/{id}:
+    delete:
+      tags: [admin]
+      summary: 删除评论（管理端）
+      operationId: adminDeleteComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/reports:
+    get:
+      tags: [admin]
+      summary: 举报队列
+      operationId: adminListReports
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: target_type
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminReportListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/reports/{id}:
+    put:
+      tags: [admin]
+      summary: 处理举报
+      operationId: adminHandleReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminReportHandleRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/categories:
+    post:
+      tags: [admin]
+      summary: 创建分类
+      operationId: adminCreateCategory
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminCategoryRequest' }
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/categories/{id}:
+    put:
+      tags: [admin]
+      summary: 更新分类
+      operationId: adminUpdateCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminCategoryRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [admin]
+      summary: 删除分类（其下文章置为未分类）
+      operationId: adminDeleteCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/tags:
+    post:
+      tags: [admin]
+      summary: 创建标签
+      operationId: adminCreateTag
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminTagRequest' }
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/tags/{id}:
+    put:
+      tags: [admin]
+      summary: 更新标签
+      operationId: adminUpdateTag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminTagRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [admin]
+      summary: 删除标签
+      operationId: adminDeleteTag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/tags/merge:
+    post:
+      tags: [admin]
+      summary: 合并标签
+      operationId: adminMergeTags
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminTagMergeRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMutationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/settings:
+    get:
+      tags: [admin]
+      summary: 全部系统配置
+      operationId: adminGetSettings
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettingsResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [admin]
+      summary: 批量更新配置
+      operationId: adminUpdateSettings
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSettingsUpdateRequest' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettingsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/media:
+    get:
+      tags: [admin]
+      summary: 媒体库列表
+      operationId: adminListMedia
+      parameters:
+        - name: purpose
+          in: query
+          schema: { type: string, enum: [article, avatar, chat] }
+        - name: uploader_id
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMediaListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/logs:
+    get:
+      tags: [admin]
+      summary: 操作日志
+      operationId: adminListLogs
+      parameters:
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: target_type
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminLogListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/index-failures:
+    get:
+      tags: [admin]
+      summary: 索引同步失败的文章
+      operationId: adminIndexFailures
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminIndexFailureListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/index-rebuild:
+    post:
+      tags: [admin]
+      summary: 重建索引
+      operationId: adminReindex
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminReindexRequest' }
+      description: |
+        `all=true` 为全量重建：文章量大时同步执行会超过网关超时（Nginx 60s），
+        因此该模式立即返回 202，实际重建在后台执行，可用 /admin/index-failures 观察失败队列。
+        `article_id` 单篇重建仍是同步 200。
+      responses:
+        '200':
+          description: 成功（单篇重建）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminReindexResponse' }
+        '202':
+          description: 已接受，全量重建在后台执行
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminReindexResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/counters/recalc:
+    post:
+      tags: [admin]
+      summary: 重算分类与标签计数
+      operationId: adminRecalcCounters
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminRecalcResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /uploads/images:
+    post:
+      tags: [media]
+      summary: 上传图片
+      description: |
+        通用图片上传（API_SPEC 4.7）。purpose=article/avatar 走公开桶，
+        purpose=chat 走私有桶（仅会话成员经 /media/{id}/url 换签名地址访问）。
+        真实类型读文件魔数判定；sha256 命中已有记录时直接复用。
+      operationId: uploadImage
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                purpose:
+                  type: string
+                  enum: [article, avatar, chat]
+                  default: article
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImageUploadResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /media/{id}/url:
+    get:
+      tags: [media]
+      summary: 获取媒体访问地址
+      description: |
+        公开桶媒体返回永久 URL；聊天图片（私有桶）校验调用者为该媒体所属
+        会话成员后签发 1 小时有效的签名 URL，非成员 403（API_SPEC 4.7）。
+      operationId: getMediaUrl
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaUrlResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /conversations:
+    get:
+      tags: [chat]
+      summary: 会话列表
+      description: 按 last_message_at 倒序，无消息的会话排最后（API_SPEC 4.8）。
+      operationId: listConversations
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [chat]
+      summary: 发起单聊
+      description: |
+        幂等：会话已存在直接返回（created=false）。conversation_key =
+        min(uid):max(uid) 保证 (A,B) 与 (B,A) 唯一。每日新建上限 20 个。
+      operationId: createConversation
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversationCreateRequest' }
+      responses:
+        '200':
+          description: 会话已存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationCreateResponse' }
+        '201':
+          description: 会话已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationCreateResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /conversations/{id}/messages:
+    get:
+      tags: [chat]
+      summary: 历史消息
+      description: |
+        before_id 向上翻历史（降序），after_seq 断线补齐（升序），二者互斥。
+        消息不含 is_read，响应带 peer_last_read_seq 供前端按 seq 比较（API_SPEC 4.8）。
+      operationId: listMessages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: before_id
+          in: query
+          schema: { type: string }
+        - name: after_seq
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 30, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageListResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [chat]
+      summary: 发送消息
+      description: |
+        client_msg_id 幂等：重复提交返回首次结果（200），首次为 201。
+        落库成功后经 WebSocket 推送 message.new 给对方。对方账号不可用返回 50003。
+      operationId: sendMessage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageSendRequest' }
+      responses:
+        '200':
+          description: 幂等命中（此前已发送成功）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageSendResponse' }
+        '201':
+          description: 发送成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageSendResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /conversations/{id}/read:
+    put:
+      tags: [chat]
+      summary: 标记会话已读
+      description: |
+        更新调用者自己的已读游标（user_id 取自登录态）。单调递增，新值小于
+        当前值不生效仍返回 204；大于 seq_counter 时按 seq_counter 截断。
+        成功后推送 message.read 给对方（API_SPEC 4.8）。
+      operationId: markConversationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversationReadRequest' }
+      responses:
+        '204':
+          description: 已标记
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /conversations/{id}/mute:
+    put:
+      tags: [chat]
+      summary: 会话免打扰
+      operationId: setConversationMute
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversationMuteRequest' }
+      responses:
+        '204':
+          description: 已设置
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /ws/ticket:
+    post:
+      tags: [chat]
+      summary: 获取 WebSocket 票据
+      description: 一次性使用，60 秒有效，用完即删（API_SPEC 4.8）。
+      operationId: createWsTicket
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WsTicketResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /ws:
+    get:
+      tags: [chat]
+      summary: WebSocket 连接
+      description: |
+        WebSocket 升级端点，凭一次性 ticket 连接。票据无效 4001 关闭，
+        账号被禁用 4003 关闭。V1.0 仅下行推送，无上行消息（API_SPEC 4.8）。
+        注意：实际路径在站点根 /ws（不在 /api/v1 下），Nginx 按
+        TECH_DESIGN 15.4 单独代理。
+      operationId: wsConnect
+      parameters:
+        - name: ticket
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '101':
+          description: 升级为 WebSocket
+        '400':
+          description: 缺少 ticket
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+      description: 从 `csrf_token` Cookie 读取，写请求必带
+
+  responses:
+    BadRequest:
+      description: 参数错误（10001）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 未登录或凭证失效（10002）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 已登录但无权限（10003 / 10006 CSRF 失败）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 资源不存在（10004）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: 冲突（20001 邮箱已注册 / 20002 用户名占用）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: 触发限流（10005）
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: 建议等待秒数
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: 依赖不可用（11005 存储等）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ---------- 通用 ----------
+    ErrorResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          description: 业务错误码，非 0 即失败
+          example: 20003
+        message:
+          type: string
+          description: 可直接展示给用户的中文提示
+          example: 用户名或密码错误
+        data:
+          nullable: true
+          description: 失败时恒为 null
+        request_id:
+          type: string
+          example: 01HQZ8X2K9J4M
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          example: password
+        message:
+          type: string
+          example: 密码至少 8 位
+      description: 参数校验失败时的字段级明细，放在 data.errors
+
+    ValidationErrorData:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    SimpleResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+        request_id:
+          type: string
+
+    # ---------- 用户 ----------
+    Role:
+      type: string
+      enum: [reader, author, admin]
+      description: 角色层级 reader < author < admin
+
+    UserStatus:
+      type: string
+      enum: [pending_verify, active, disabled]
+
+    UserFull:
+      type: object
+      required: [id, username, email, nickname, avatar_url, bio, role, status, created_at]
+      properties:
+        id:
+          type: string
+          example: "1001"
+        username:
+          type: string
+          example: zhangsan
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+          example: 张三
+        avatar_url:
+          type: string
+          example: https://cdn.example.com/a/256.webp
+        bio:
+          type: string
+          example: 写代码的
+        role:
+          $ref: '#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    UserBrief:
+      type: object
+      required: [id, nickname, avatar_url]
+      properties:
+        id:
+          type: string
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+
+    UserPublic:
+      type: object
+      required: [id, username, nickname, avatar_url, bio, article_count, created_at]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+        bio:
+          type: string
+        article_count:
+          type: integer
+          description: 已发布文章数
+        created_at:
+          type: string
+          format: date-time
+
+    # ---------- 认证请求 ----------
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 4
+          maxLength: 20
+          pattern: '^[a-zA-Z0-9_]+$'
+          description: 4–20 位字母、数字、下划线
+        email:
+          type: string
+          format: email
+          maxLength: 128
+        password:
+          type: string
+          minLength: 8
+          maxLength: 32
+          description: 8–32 位，须同时包含字母与数字
+          format: password
+
+    EmailOnlyRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    LoginRequest:
+      type: object
+      required: [account, password]
+      properties:
+        account:
+          type: string
+          description: 邮箱或用户名
+          example: zhang@example.com
+        password:
+          type: string
+          format: password
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token:
+          type: string
+          description: 邮件中的重置令牌
+        new_password:
+          type: string
+          minLength: 8
+          maxLength: 32
+          format: password
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 32
+        bio:
+          type: string
+          maxLength: 255
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          minLength: 8
+          maxLength: 32
+          format: password
+
+    # ---------- 认证响应 ----------
+    RegisterData:
+      type: object
+      required: [user_id, status]
+      properties:
+        user_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    RegisterResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: 注册成功，请查收验证邮件
+        data:
+          $ref: '#/components/schemas/RegisterData'
+        request_id:
+          type: string
+
+    LoginData:
+      type: object
+      required: [user, csrf_token]
+      properties:
+        user:
+          $ref: '#/components/schemas/UserFull'
+        csrf_token:
+          type: string
+          description: 同时写入非 HttpOnly Cookie，前端读取后放入请求头
+
+    LoginResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/LoginData'
+        request_id:
+          type: string
+
+    RefreshData:
+      type: object
+      required: [csrf_token]
+      properties:
+        csrf_token:
+          type: string
+
+    RefreshResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/RefreshData'
+        request_id:
+          type: string
+
+    UserResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/UserFull'
+        request_id:
+          type: string
+
+    PublicUserResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/UserPublic'
+        request_id:
+          type: string
+
+    AvatarData:
+      type: object
+      required: [avatar_url, media_id]
+      properties:
+        avatar_url:
+          type: string
+        media_id:
+          type: string
+
+    AvatarResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/AvatarData'
+        request_id:
+          type: string
+
+    ArticleStatus:
+      type: string
+      enum: [draft, pending, published, rejected, offline, archived, deleted]
+
+    AuthorBrief:
+      type: object
+      required: [id, nickname, avatar_url]
+      properties:
+        id: { type: string }
+        nickname: { type: string }
+        avatar_url: { type: string }
+
+    CategoryBrief:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    TagBrief:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    CategoryItem:
+      type: object
+      required: [id, name, slug, article_count]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        article_count: { type: integer }
+        sort: { type: integer }
+
+    TagItem:
+      type: object
+      required: [id, name, slug, article_count]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        article_count: { type: integer }
+
+    ArticleBrief:
+      type: object
+      required: [id, slug, title, summary, cover_url, author, view_count, like_count, comment_count, reading_time, is_top]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        cover_url: { type: string }
+        author: { $ref: '#/components/schemas/AuthorBrief' }
+        category:
+          allOf:
+            - $ref: '#/components/schemas/CategoryBrief'
+          nullable: true
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/TagBrief' }
+        view_count: { type: integer }
+        like_count: { type: integer }
+        comment_count: { type: integer }
+        reading_time: { type: integer }
+        is_top: { type: boolean }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MyArticleItem:
+      type: object
+      required: [id, slug, title, status, version, view_count, like_count, comment_count, updated_at]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+        version: { type: integer }
+        view_count: { type: integer }
+        like_count: { type: integer }
+        comment_count: { type: integer }
+        reject_reason: { type: string }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    ArticleListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ArticleBrief' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    ArticleListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ArticleListData' }
+        request_id: { type: string }
+
+    MyArticleListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MyArticleItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    MyArticleListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/MyArticleListData' }
+        request_id: { type: string }
+
+    ArticleDetail:
+      type: object
+      required: [id, slug, title, content_html, status, author, view_count, like_count, favorite_count, comment_count, allow_comment, is_liked, is_favorited]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        content_html: { type: string }
+        cover_url: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+        author: { $ref: '#/components/schemas/AuthorBrief' }
+        category:
+          allOf:
+            - $ref: '#/components/schemas/CategoryBrief'
+          nullable: true
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/TagBrief' }
+        view_count: { type: integer }
+        like_count: { type: integer }
+        favorite_count: { type: integer }
+        comment_count: { type: integer }
+        reading_time: { type: integer }
+        allow_comment: { type: boolean }
+        is_liked: { type: boolean }
+        is_favorited: { type: boolean }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    ArticleDetailResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ArticleDetail' }
+        request_id: { type: string }
+
+    ArticleEdit:
+      type: object
+      required: [id, title, slug, content_md, status, version, allow_comment, updated_at]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        slug: { type: string }
+        summary: { type: string }
+        content_md: { type: string }
+        cover_url: { type: string }
+        category_id: { type: string }
+        tag_ids:
+          type: array
+          items: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+        version: { type: integer }
+        allow_comment: { type: boolean }
+        reject_reason: { type: string }
+        updated_at:
+          type: string
+          format: date-time
+
+    ArticleEditResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ArticleEdit' }
+        request_id: { type: string }
+
+    CreateArticleRequest:
+      type: object
+      required: [title, content_md]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]{1,200}$'
+          description: 为空则按标题生成，冲突返回 30003
+        content_md: { type: string, minLength: 1 }
+        summary: { type: string, maxLength: 512 }
+        cover_url: { type: string, maxLength: 255 }
+        category_id: { type: string, description: 默认 "0" 表示未分类 }
+        tag_ids:
+          type: array
+          maxItems: 5
+          items: { type: string }
+        allow_comment: { type: boolean }
+
+    UpdateArticleRequest:
+      type: object
+      required: [version]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]{1,200}$'
+        content_md: { type: string, minLength: 1 }
+        summary: { type: string, maxLength: 512 }
+        cover_url: { type: string, maxLength: 255 }
+        category_id: { type: string }
+        tag_ids:
+          type: array
+          maxItems: 5
+          items: { type: string }
+        allow_comment: { type: boolean }
+        version: { type: integer, description: 与当前版本不一致返回 30004 }
+
+    ArticleMutationData:
+      type: object
+      required: [id, slug, status, version]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+        version: { type: integer }
+
+    ArticleMutationResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ArticleMutationData' }
+        request_id: { type: string }
+
+    ArticleStatusData:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+
+    ArticleStatusResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ArticleStatusData' }
+        request_id: { type: string }
+
+    CategoryListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/CategoryItem' }
+        request_id: { type: string }
+
+    TagListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/TagItem' }
+        request_id: { type: string }
+
+    SearchItem:
+      type: object
+      required: [id, slug, title, summary, published_at]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        highlight: { type: string, description: 高亮片段，未命中时为标题 }
+        summary: { type: string }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SearchData:
+      type: object
+      required: [items, page, page_size, estimated_total, has_more, degraded]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SearchItem' }
+        page: { type: integer }
+        page_size: { type: integer }
+        estimated_total: { type: integer, description: 估算值，不得用于计算总页数 }
+        has_more: { type: boolean }
+        degraded: { type: boolean, description: true 表示检索服务不可用，结果为降级空集 }
+
+    SearchResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/SearchData' }
+        request_id: { type: string }
+
+    LikeData:
+      type: object
+      required: [liked, like_count]
+      properties:
+        liked: { type: boolean }
+        like_count: { type: integer }
+
+    LikeResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/LikeData' }
+        request_id: { type: string }
+
+    FavoriteData:
+      type: object
+      required: [favorited, favorite_count]
+      properties:
+        favorited: { type: boolean }
+        favorite_count: { type: integer }
+
+    FavoriteResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/FavoriteData' }
+        request_id: { type: string }
+
+    CreateCommentRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 1000 }
+        parent_id: { type: string, description: 回复时填父评论 ID，主楼填 "0" }
+        reply_to_user_id: { type: string, description: 被回复者用户 ID，主楼填 "0" }
+
+    CommentItem:
+      type: object
+      required: [id, user, content, status, reply_count, created_at]
+      properties:
+        id: { type: string }
+        user: { $ref: '#/components/schemas/AuthorBrief' }
+        reply_to_user:
+          allOf:
+            - $ref: '#/components/schemas/AuthorBrief'
+          nullable: true
+        content: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        reply_count: { type: integer }
+        deleted: { type: boolean, description: true 表示已删除占位 }
+        replies:
+          type: array
+          items: { $ref: '#/components/schemas/CommentItem' }
+        created_at:
+          type: string
+          format: date-time
+
+    CommentListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CommentItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    CommentListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/CommentListData' }
+        request_id: { type: string }
+
+    CommentMutationData:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, approved] }
+
+    CommentMutationResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/CommentMutationData' }
+        request_id: { type: string }
+
+    ReportRequest:
+      type: object
+      required: [target_type, target_id, reason]
+      properties:
+        target_type: { type: string, enum: [article, comment, message, conversation] }
+        target_id: { type: string }
+        reason: { type: string, enum: [spam, abuse, porn, illegal, other] }
+        detail: { type: string, maxLength: 512 }
+
+    ReportData:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        duplicate: { type: boolean, description: true 表示重复举报，未新增 }
+
+    ReportResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ReportData' }
+        request_id: { type: string }
+
+    FavoriteListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ArticleBrief' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    FavoriteListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/FavoriteListData' }
+        request_id: { type: string }
+
+    NotificationItem:
+      type: object
+      required: [id, type, title, content, is_read, created_at]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        content: { type: string }
+        link: { type: string }
+        ref_id: { type: string, nullable: true }
+        is_read: { type: boolean }
+        created_at:
+          type: string
+          format: date-time
+
+    NotificationListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    NotificationListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/NotificationListData' }
+        request_id: { type: string }
+
+    UnreadCountData:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+
+    UnreadCountResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/UnreadCountData' }
+        request_id: { type: string }
+
+    AdminOverviewData:
+      type: object
+      required: [article_count, user_count, pending_article_count, pending_comment_count, today_new_articles, today_new_users]
+      properties:
+        article_count: { type: integer }
+        user_count: { type: integer }
+        pending_article_count: { type: integer }
+        pending_comment_count: { type: integer }
+        today_new_articles: { type: integer }
+        today_new_users: { type: integer }
+
+    AdminOverviewResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminOverviewData' }
+        request_id: { type: string }
+
+    AdminUserItem:
+      type: object
+      required: [id, username, email, nickname, role, status, created_at]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        email: { type: string }
+        nickname: { type: string }
+        role: { type: string }
+        status: { type: string }
+        article_count: { type: integer }
+        created_at:
+          type: string
+          format: date-time
+
+    AdminUserListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUserItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminUserListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminUserListData' }
+        request_id: { type: string }
+
+    AdminUserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, disabled] }
+        reason: { type: string, maxLength: 255 }
+
+    AdminUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [reader, author] }
+
+    AdminMutationData:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+
+    AdminMutationResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminMutationData' }
+        request_id: { type: string }
+
+    AdminArticleItem:
+      type: object
+      required: [id, title, slug, status, author_id, author_name, created_at]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        slug: { type: string }
+        status: { type: string }
+        author_id: { type: string }
+        author_name: { type: string }
+        view_count: { type: integer }
+        like_count: { type: integer }
+        comment_count: { type: integer }
+        reject_reason: { type: string }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AdminArticleListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminArticleItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminArticleListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminArticleListData' }
+        request_id: { type: string }
+
+    AdminArticleReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 255 }
+
+    AdminArticleStatusData:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string }
+
+    AdminArticleStatusResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminArticleStatusData' }
+        request_id: { type: string }
+
+    AdminCommentItem:
+      type: object
+      required: [id, article_id, user_id, content, status, created_at]
+      properties:
+        id: { type: string }
+        article_id: { type: string }
+        user_id: { type: string }
+        content: { type: string }
+        status: { type: string }
+        ip: { type: string }
+        created_at:
+          type: string
+          format: date-time
+
+    AdminCommentListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminCommentItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminCommentListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminCommentListData' }
+        request_id: { type: string }
+
+    AdminReportItem:
+      type: object
+      required: [id, reporter_id, target_type, target_id, reason, status, created_at]
+      properties:
+        id: { type: string }
+        reporter_id: { type: string }
+        target_type: { type: string }
+        target_id: { type: string }
+        reason: { type: string }
+        detail: { type: string }
+        status: { type: string }
+        handle_note: { type: string }
+        created_at:
+          type: string
+          format: date-time
+
+    AdminReportListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminReportItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminReportListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminReportListData' }
+        request_id: { type: string }
+
+    AdminReportHandleRequest:
+      type: object
+      required: [result]
+      properties:
+        result: { type: string, enum: [accepted, rejected] }
+        note: { type: string, maxLength: 255 }
+        action:
+          type: string
+          enum: [none, offline, delete_comment, disable_user]
+          description: result=accepted 时可联动处置
+
+    AdminCategoryRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]{1,64}$'
+        description: { type: string, maxLength: 255 }
+        sort: { type: integer }
+
+    AdminTagRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 32 }
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]{1,32}$'
+
+    AdminTagMergeRequest:
+      type: object
+      required: [from_id, to_id]
+      properties:
+        from_id: { type: string }
+        to_id: { type: string }
+
+    AdminSettingItem:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        value: { type: string }
+        description: { type: string }
+        group: { type: string }
+
+    AdminSettingsData:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminSettingItem' }
+
+    AdminSettingsResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminSettingsData' }
+        request_id: { type: string }
+
+    AdminSettingsUpdateRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [key, value]
+            properties:
+              key: { type: string }
+              value: { type: string }
+
+    AdminLogItem:
+      type: object
+      required: [id, operator_id, action, target_type, created_at]
+      properties:
+        id: { type: string }
+        operator_id: { type: string }
+        action: { type: string }
+        target_type: { type: string }
+        target_id: { type: string }
+        detail: { type: string }
+        ip: { type: string }
+        created_at:
+          type: string
+          format: date-time
+
+    AdminLogListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminLogItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminLogListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminLogListData' }
+        request_id: { type: string }
+
+    AdminIndexFailureItem:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        article_status: { type: string }
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminIndexFailureListData:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminIndexFailureItem' }
+
+    AdminIndexFailureListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminIndexFailureListData' }
+        request_id: { type: string }
+
+    AdminReindexRequest:
+      type: object
+      properties:
+        article_id: { type: string, description: 单篇重建 }
+        all: { type: boolean, description: 全量重建（与 article_id 二选一） }
+
+    AdminReindexData:
+      type: object
+      properties:
+        count: { type: integer, description: 本次重建的文章数（异步模式为 0） }
+        accepted: { type: boolean, description: 全量重建已转入后台执行 }
+
+    AdminReindexResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminReindexData' }
+        request_id: { type: string }
+
+    AdminRecalcData:
+      type: object
+      required: [categories, tags]
+      properties:
+        categories: { type: integer, description: 重算的分类数 }
+        tags: { type: integer, description: 重算的标签数 }
+
+    AdminRecalcResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminRecalcData' }
+        request_id: { type: string }
+
+    NotificationReadAllData:
+      type: object
+      required: [updated]
+      properties:
+        updated: { type: integer, description: 本次标记为已读的条数 }
+
+    NotificationReadAllResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/NotificationReadAllData' }
+        request_id: { type: string }
+
+    AdminArticleDetail:
+      type: object
+      required: [id, title, slug, content_md, status, author_id, version]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        slug: { type: string }
+        summary: { type: string }
+        content_md: { type: string }
+        cover_url: { type: string }
+        status: { type: string }
+        author_id: { type: string }
+        author_name: { type: string }
+        category_id: { type: string }
+        tag_ids:
+          type: array
+          items: { type: string }
+        view_count: { type: integer }
+        like_count: { type: integer }
+        favorite_count: { type: integer }
+        comment_count: { type: integer }
+        version: { type: integer }
+        allow_comment: { type: boolean }
+        reject_reason: { type: string, nullable: true }
+        offline_reason: { type: string, nullable: true }
+        deleted: { type: boolean }
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AdminArticleDetailResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminArticleDetail' }
+        request_id: { type: string }
+
+    AdminMediaItem:
+      type: object
+      required: [id, url, mime_type, purpose, created_at]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        original_name: { type: string }
+        mime_type: { type: string }
+        size: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        variants: { type: string, description: JSON 字符串，各尺寸对象 Key }
+        purpose: { type: string }
+        uploader_id: { type: string }
+        created_at:
+          type: string
+          format: date-time
+
+    AdminMediaListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminMediaItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    AdminMediaListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/AdminMediaListData' }
+        request_id: { type: string }
+
+    ImageUploadData:
+      type: object
+      required: [media_id, url, width, height, variants]
+      properties:
+        media_id: { type: string }
+        url: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        variants:
+          type: object
+          additionalProperties: { type: string }
+
+    ImageUploadResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ImageUploadData' }
+        request_id: { type: string }
+
+    MediaUrlData:
+      type: object
+      required: [url, expires_at]
+      properties:
+        url: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+
+    MediaUrlResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/MediaUrlData' }
+        request_id: { type: string }
+
+    ChatPeer:
+      type: object
+      required: [id, nickname, online]
+      properties:
+        id: { type: string }
+        nickname: { type: string }
+        avatar_url: { type: string, nullable: true }
+        online: { type: boolean }
+
+    ChatLastMessage:
+      type: object
+      required: [id, preview, sender_id, created_at]
+      properties:
+        id: { type: string }
+        preview: { type: string }
+        sender_id: { type: string }
+        created_at: { type: string, format: date-time }
+
+    ConversationListItem:
+      type: object
+      required: [id, type, peer, unread_count, is_muted]
+      properties:
+        id: { type: string }
+        type: { type: string, example: single }
+        peer: { $ref: '#/components/schemas/ChatPeer' }
+        last_message:
+          allOf:
+            - $ref: '#/components/schemas/ChatLastMessage'
+          nullable: true
+        unread_count: { type: integer }
+        is_muted: { type: boolean }
+
+    ConversationListData:
+      type: object
+      required: [items, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ConversationListItem' }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+
+    ConversationListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ConversationListData' }
+        request_id: { type: string }
+
+    ConversationCreateRequest:
+      type: object
+      required: [peer_id]
+      properties:
+        peer_id: { type: string }
+
+    ConversationCreateData:
+      type: object
+      required: [id, type, created]
+      properties:
+        id: { type: string }
+        type: { type: string, example: single }
+        created: { type: boolean }
+
+    ConversationCreateResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/ConversationCreateData' }
+        request_id: { type: string }
+
+    ChatMessage:
+      type: object
+      required: [id, seq, sender_id, type, content, status, created_at]
+      properties:
+        id: { type: string }
+        seq: { type: integer }
+        sender_id: { type: string }
+        type: { type: string, enum: [text, image] }
+        content: { type: string }
+        status: { type: string, enum: [normal], example: normal }
+        created_at: { type: string, format: date-time }
+
+    MessageListData:
+      type: object
+      required: [items, has_more, peer_last_read_seq]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ChatMessage' }
+        has_more: { type: boolean }
+        peer_last_read_seq: { type: integer }
+
+    MessageListResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/MessageListData' }
+        request_id: { type: string }
+
+    MessageSendRequest:
+      type: object
+      required: [type, content, client_msg_id]
+      properties:
+        type: { type: string, enum: [text, image] }
+        content: { type: string, maxLength: 2000 }
+        client_msg_id: { type: string, minLength: 1, maxLength: 64 }
+
+    MessageSendData:
+      type: object
+      required: [id, seq, created_at]
+      properties:
+        id: { type: string }
+        seq: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    MessageSendResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/MessageSendData' }
+        request_id: { type: string }
+
+    ConversationReadRequest:
+      type: object
+      required: [last_read_seq]
+      properties:
+        last_read_seq: { type: integer, minimum: 0 }
+
+    ConversationMuteRequest:
+      type: object
+      required: [muted]
+      properties:
+        muted: { type: boolean }
+
+    WsTicketData:
+      type: object
+      required: [ticket, expires_in]
+      properties:
+        ticket: { type: string }
+        expires_in: { type: integer, example: 60 }
+
+    WsTicketResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: { $ref: '#/components/schemas/WsTicketData' }
+        request_id: { type: string }

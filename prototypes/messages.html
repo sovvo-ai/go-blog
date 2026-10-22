@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>消息 · 墨痕</title>
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+.topbar { align-items: center; }
+.msg-layout { display: flex; height: calc(100vh - 130px); min-height: 460px; }
+.conv-list { width: 270px; flex-shrink: 0; border-right: 0.5px solid var(--hairline); overflow-y: auto; }
+.conv-search { padding: 12px 14px; border-bottom: 0.5px solid var(--hairline); }
+.conv-search input { width: 100%; height: 32px; border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 0 10px; font-size: 12px; color: var(--ink-4); }
+.conv { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 0.5px solid var(--hairline); cursor: pointer; }
+.conv.on { background: var(--paper-2); border-left: 3px solid var(--ink); padding-left: 11px; }
+.conv .ava { width: 36px; height: 36px; border-radius: 50%; background: #D3D1C7; color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.conv .row1 { display: flex; align-items: baseline; gap: 6px; }
+.conv .name { font-family: var(--serif); font-size: 14px; color: var(--ink); margin: 0; }
+.conv .time { margin-left: auto; font-size: 11px; color: var(--ink-4); }
+.conv .preview { font-size: 12px; color: var(--ink-3); margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unread-badge { margin-left: auto; background: var(--ink); color: #fff; font-size: 10px; border-radius: 8px; padding: 1px 6px; }
+.chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-head { height: 50px; border-bottom: 0.5px solid var(--hairline); display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+.chat-head .peer { font-family: var(--serif); font-size: 15px; color: var(--ink); margin: 0; }
+.chat-head .online { font-size: 11px; color: var(--ink-4); margin: 0; }
+.chat-head .ops { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--ink-3); }
+.chat-head .ops span { border-bottom: 0.5px solid #D3D1C7; cursor: pointer; }
+.bubbles { flex: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.bubble { max-width: 70%; }
+.bubble .who { font-size: 11px; color: var(--ink-4); margin: 0 0 4px; }
+.bubble .text { border-radius: 2px 8px 8px 8px; padding: 9px 13px; font-size: 13px; color: var(--ink); line-height: 1.7; background: #fff; border: 0.5px solid #D3D1C7; }
+.bubble.mine { align-self: flex-end; text-align: right; }
+.bubble.mine .text { background: var(--ink); color: #fff; border: none; border-radius: 8px 2px 8px 8px; }
+.bubble .read { font-size: 11px; color: #D1D5DB; margin: 3px 0 0; }
+.composer { border-top: 0.5px solid var(--hairline); padding: 12px 18px; }
+.composer .row { display: flex; gap: 8px; align-items: flex-end; }
+.composer .attach { width: 32px; height: 32px; border: 0.5px solid #D3D1C7; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink-3); cursor: pointer; }
+.composer input { flex: 1; height: 38px; border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 0 12px; font-size: 13px; }
+.composer .hint { font-size: 11px; color: #D1D5DB; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="logo">墨痕</span>
+  <nav><a href="/">首页</a><a href="#">分类</a><a class="active" href="/messages.html">消息</a><a href="#">标签</a></nav>
+  <div class="right"><span style="font-size:12px;">未读 3</span><div class="avatar-dot">李</div></div>
+</header>
+
+<div class="msg-layout">
+  <aside class="conv-list">
+    <div class="conv-search"><input placeholder="搜索会话…"></div>
+    <div class="conv on">
+      <div class="ava" style="background:var(--ink);">张</div>
+      <div style="min-width:0;flex:1;">
+        <div class="row1"><p class="name" style="font-weight:500;">阿张</p><span class="time">14:32</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><p class="preview">根路径推送测试那条你看到了吧</p><span class="unread-badge">3</span></div>
+      </div>
+    </div>
+    <div class="conv">
+      <div class="ava">王</div>
+      <div style="min-width:0;flex:1;">
+        <div class="row1"><p class="name">阿王</p><span class="time">周三</span></div>
+        <p class="preview">[图片]</p>
+      </div>
+    </div>
+    <div class="conv">
+      <div class="ava" style="background:#9CA3AF;">系</div>
+      <div style="min-width:0;flex:1;">
+        <div class="row1"><p class="name">系统通知</p><span class="time">周二</span></div>
+        <p class="preview">你的文章已通过审核</p>
+      </div>
+    </div>
+  </aside>
+
+  <section class="chat">
+    <div class="chat-head">
+      <div class="ava" style="width:28px;height:28px;background:var(--ink);">张</div>
+      <p class="peer">阿张</p><span class="online">在线</span>
+      <div class="ops"><span>举报</span><span>免打扰</span></div>
+    </div>
+    <div class="bubbles">
+      <div class="bubble">
+        <p class="who">阿张 · 14:30</p>
+        <div class="text">根路径推送测试那条你看到了吧</div>
+        <p class="read">已读</p>
+      </div>
+      <div class="bubble mine">
+        <p class="who">我 · 14:31</p>
+        <div class="text">看到了，V1.0 只做下行，稳</div>
+      </div>
+      <div class="bubble">
+        <p class="who">阿张 · 14:32</p>
+        <div class="text">等群聊上了把架构篇也发群里</div>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="row">
+        <div class="attach">图</div>
+        <input placeholder="输入消息，Enter 发送…">
+        <button class="btn-dark" style="height:38px;padding:0 20px;">发送</button>
+      </div>
+      <p class="hint">HTTP 发送 · WebSocket 接收 · 断线自动补齐 · V1.1 预留群聊</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>

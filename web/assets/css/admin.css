@@ -1,0 +1,46 @@
+/* 管理端共享样式（B 皮） */
+body { background: var(--paper); }
+.admin-layout { display: flex; min-height: 100vh; }
+.admin-menu { width: 200px; flex-shrink: 0; border-right: 0.5px solid var(--hairline); padding: 16px 12px; display: flex; flex-direction: column; }
+.admin-menu .logo { font-family: var(--serif); font-size: 16px; font-weight: 500; color: var(--ink); padding: 4px 10px 18px; }
+.admin-menu nav { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.admin-menu nav a { color: var(--ink-2); padding: 9px 12px; border-radius: 2px; }
+.admin-menu nav a.on { background: var(--ink); color: #fff; }
+.admin-menu .menu-foot { margin-top: auto; padding: 12px 10px 0; border-top: 0.5px solid var(--hairline); display: flex; align-items: center; gap: 8px; }
+.admin-menu .menu-foot .name { font-size: 12px; color: var(--ink); font-weight: 500; margin: 0; }
+.admin-menu .menu-foot .role { font-size: 11px; color: var(--ink-4); margin: 0; }
+.admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.admin-crumb { height: 50px; border-bottom: 0.5px solid var(--hairline); display: flex; align-items: center; padding: 0 24px; font-size: 13px; color: var(--ink-3); gap: 6px; }
+.admin-crumb .page { font-family: var(--serif); color: var(--ink); }
+.admin-crumb .crumb-sep { color: #D1D5DB; }
+.admin-content { padding: 24px; flex: 1; }
+
+/* 统计带（发丝线四格） */
+.stat-band { display: grid; grid-template-columns: repeat(4,1fr); border: 0.5px solid var(--hairline); }
+.stat-band .cell { padding: 16px; border-right: 0.5px solid var(--hairline); }
+.stat-band .cell:last-child { border-right: none; }
+.stat-band .label { font-size: 12px; color: var(--ink-4); margin: 0 0 6px; }
+.stat-band .num { font-family: var(--mono); font-size: 26px; font-weight: 500; color: var(--ink); margin: 0; }
+.stat-band .delta { font-size: 11px; color: var(--ink-3); margin: 4px 0 0; }
+.stat-band .cell.warn { background: #FFFBEB; }
+.stat-band .cell.warn .num, .stat-band .cell.warn .delta { color: var(--amber); }
+
+/* 表格（发丝线） */
+.hairline-table { border-top: 2px solid var(--ink); font-size: 13px; }
+.hairline-table .thead { display: grid; font-size: 12px; color: var(--ink-3); font-weight: 500; padding: 10px 0; border-bottom: 0.5px solid var(--hairline); }
+.hairline-table .trow { display: grid; align-items: center; border-bottom: 0.5px solid var(--hairline); min-height: 48px; }
+.hairline-table .trow:hover { background: var(--paper-2); }
+.hairline-table .cell-title { padding: 8px 14px 8px 4px; color: var(--ink); font-family: var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hairline-table .cell { color: var(--ink-2); font-size: 12.5px; }
+.hairline-table .ops { display: flex; gap: 12px; justify-content: flex-end; font-size: 12px; padding-right: 4px; }
+.link-u { color: var(--ink); border-bottom: 0.5px solid var(--ink); cursor: pointer; }
+.link-dim { color: var(--ink-4); }
+
+/* 表单控件 */
+.admin-input { height: 36px; border: 0.5px solid #D3D1C7; border-radius: 2px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: var(--ink-4); }
+.admin-select { height: 36px; border: 0.5px solid #D3D1C7; border-radius: 2px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: var(--ink-2); gap: 8px; cursor: pointer; }
+
+/* 分页 */
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 16px; font-size: 12px; color: var(--ink-3); }
+.pager span { border: 0.5px solid #D3D1C7; border-radius: 2px; padding: 4px 10px; cursor: pointer; }
+.pager .on { background: var(--ink); color: #fff; border-color: var(--ink); }

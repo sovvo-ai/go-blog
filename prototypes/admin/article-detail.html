@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审核详情 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a href="/admin/index.html">概览</a><a href="/admin/users.html">用户管理</a><a class="on" href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a href="/admin/settings.html">系统设置</a><a href="/admin/index-status.html">索引状态</a><a href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">文章审核</span><span class="crumb-sep">/</span> 审核详情</div>
+    <div class="admin-content"><div style="display:flex;align-items:center;margin-bottom:18px;">
+  <span style="font-size:12px;color:var(--ink-3);">← <a class="link-u" href="/admin/articles.html">返回列表</a></span>
+  <div style="margin-left:auto;display:flex;gap:10px;">
+    <button class="btn-dark" style="height:36px;padding:0 20px;">通过并发布</button>
+    <span class="btn-ghost-sm" style="color:#DC2626;border-color:#DC2626;">拒绝…</span>
+    <span class="btn-ghost-sm">删除</span>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start;">
+  <div style="border:0.5px solid var(--hairline);padding:24px;">
+    <p style="margin:0 0 8px;font-size:12px;color:var(--ink-4);">架构 · 提交于 2026-10-22 08:40 · 版本 v3</p>
+    <h1 style="font-family:var(--serif);font-size:24px;color:var(--ink);margin:0 0 16px;">单聊消息序号：为什么不用 Redis INCR</h1>
+    <div style="font-size:15px;color:var(--ink-2);line-height:1.9;">
+      <p style="margin:0 0 14px;">多实例并发写入时，全局自增 id 与事务提交顺序可能不一致。会话内需要严格单调的 seq……</p>
+      <div style="background:var(--paper-2);border:0.5px solid var(--hairline);border-radius:4px;padding:12px 16px;font-family:var(--mono);font-size:13px;line-height:1.8;">UPDATE conversations<br>&nbsp;&nbsp;SET seq_counter = LAST_INSERT_ID(seq_counter + 1)<br>&nbsp;WHERE id = ?;</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div style="border:0.5px solid var(--hairline);padding:16px;">
+      <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;color:var(--ink);font-weight:500;">元信息</p>
+      <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:2.1;">作者：阿张（<a class="link-u" href="/user.html">主页</a>）<br>分类：架构<br>标签：MySQL · Go<br>Slug：chat-seq-not-redis</p>
+    </div>
+    <div style="border:0.5px solid var(--hairline);padding:16px;">
+      <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;color:var(--ink);font-weight:500;">状态与数据</p>
+      <p style="margin:0;font-size:13px;color:var(--ink-2);line-height:2.1;">状态：<span class="chip chip-amber">待审核</span><br>阅读 0 · 赞 0 · 评论 0<br>乐观锁版本：v3</p>
+    </div>
+    <div style="border:0.5px solid var(--hairline);padding:16px;">
+      <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;color:var(--ink);font-weight:500;">拒绝理由（拒绝时必填）</p>
+      <textarea placeholder="例如：内容与分类不符 / 存在未引用的断言…" style="width:100%;min-height:70px;border:0.5px solid #D3D1C7;border-radius:2px;padding:8px 10px;font-size:12px;font-family:var(--sans);"></textarea>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+</body>
+</html>

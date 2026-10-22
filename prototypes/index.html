@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>墨痕 · 首页</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+</head>
+<body>
+<header class="topbar">
+  <span class="logo">墨痕</span>
+  <nav><a class="active" href="index.html">首页</a><a href="category.html">分类</a><a href="tag.html">标签</a><a href="messages.html">消息</a><a href="#">关于</a></nav>
+  <div class="right">
+    <span style="border-bottom:0.5px solid #D3D1C7;padding-bottom:2px;">搜索</span>
+    <span>阿李</span><div class="avatar-dot">李</div>
+  </div>
+</header>
+<section style="padding:42px 40px 34px;text-align:center;border-bottom:0.5px solid var(--hairline);">
+  <p style="margin:0 0 10px;font-family:var(--serif);font-size:32px;color:var(--ink);line-height:1.5;">写作是对思考的最后一次编译。</p>
+  <p style="margin:0;font-size:13px;color:var(--ink-4);">记录 Go、数据库与系统设计的实践与复盘 · 每周三更新</p>
+</section>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:44px;padding:28px 40px 40px;align-items:start;">
+  <main>
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <span style="font-size:12px;color:var(--ink);font-weight:500;border-bottom:2px solid var(--accent);padding-bottom:4px;">最新</span>
+      <span style="font-size:12px;color:var(--ink-4);padding-bottom:4px;">热门</span>
+    </div>
+    <article class="feed-item">
+  <p class="feed-meta">后端 · 2 小时前 · 阿张</p>
+  <p class="feed-title"><a href="/article.html">Go 1.26 泛型性能实测：切片排序快了 40%？</a></p>
+  <p class="feed-summary">从编译器内联策略与逃逸分析两个角度，拆解新版泛型特化带来的性能变化，附完整 benchmark 与复现命令。</p>
+  <p style="margin:8px 0 0;font-size:12px;color:var(--ink-4);">阅读 1.2k · 赞 46 · 评论 8</p>
+</article><article class="feed-item">
+  <p class="feed-meta">架构 · 昨天 · 阿张</p>
+  <p class="feed-title"><a href="/article.html">单聊消息序号：为什么不用 Redis INCR</a></p>
+  <p class="feed-summary">用 LAST_INSERT_ID(expr) 在行锁内原子分配会话内 seq，一条 SQL 解决并发乱序，附四种方案的推演过程。</p>
+  <p style="margin:8px 0 0;font-size:12px;color:var(--ink-4);">阅读 3.4k · 赞 182 · 评论 8</p>
+</article><article class="feed-item">
+  <p class="feed-meta">数据库 · 3 天前 · 阿李</p>
+  <p class="feed-title"><a href="/article.html">MySQL 索引设计：从 EXPLAIN 到上线复盘</a></p>
+  <p class="feed-summary">一张 500 万行的消息表怎么选索引，哪些看起来有用的索引实际是负担，上线后 QPS 曲线说明了什么。</p>
+  <p style="margin:8px 0 0;font-size:12px;color:var(--ink-4);">阅读 2.1k · 赞 97 · 评论 8</p>
+</article>
+    <div style="margin-top:26px;display:flex;justify-content:space-between;align-items:center;">
+      <a class="btn-ghost" href="#">加载更多 ↓</a>
+      <span style="font-size:11px;color:#D1D5DB;">每页 3 篇 · 右栏吸附跟随</span>
+    </div>
+  </main>
+  <aside class="rail" style="border-left:0.5px solid var(--hairline);padding-left:32px;position:sticky;top:16px;align-self:start;">
+  <h4 style="font-size:12px;color:var(--ink);font-weight:500;letter-spacing:2px;margin:0 0 14px;">热门</h4>
+  <p style="margin:0 0 14px;font-family:var(--serif);font-size:14px;color:#374151;line-height:1.6;">1、WebSocket 心跳与断线补齐的正确姿势</p><p style="margin:0 0 14px;font-family:var(--serif);font-size:14px;color:#374151;line-height:1.6;">2、双 Cookie 认证的取舍记录</p><p style="margin:0 0 14px;font-family:var(--serif);font-size:14px;color:#374151;line-height:1.6;">3、Meilisearch 同步对账实践</p><p style="margin:0 0 14px;font-family:var(--serif);font-size:14px;color:#374151;line-height:1.6;">4、会话唯一键与幂等设计</p>
+  <h4 style="font-size:12px;color:var(--ink);font-weight:500;letter-spacing:2px;margin:26px 0 14px;">标签</h4>
+  <p style="margin:0;font-size:12px;color:var(--ink-3);line-height:2.2;">Go · MySQL · WebSocket · 架构 · 部署 · 测试 · Redis</p>
+  <h4 style="font-size:12px;color:var(--ink);font-weight:500;letter-spacing:2px;margin:26px 0 14px;">订阅</h4>
+  <div style="display:flex;gap:6px;">
+    <input placeholder="邮箱地址" style="flex:1;border:0.5px solid #D3D1C7;border-radius:2px;height:34px;padding:0 10px;font-size:12px;color:var(--ink-4);">
+    <button class="btn-dark">订阅</button>
+  </div>
+  <p style="margin:20px 0 0;font-size:12px;color:var(--ink-4);line-height:1.9;">文章 128 篇 · 读者 56 人<br>今日新增 3 篇</p>
+</aside>
+</div>
+<footer class="site-footer">© 2026 墨痕 · 备案号占位</footer>
+</body>
+</html>

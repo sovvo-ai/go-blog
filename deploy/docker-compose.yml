@@ -1,0 +1,202 @@
+# ============================================================
+# 本地开发编排
+#
+# 常用命令：
+#   只起阶段 0/1 所需依赖：  docker compose up -d mysql blog-redis
+#   起全部基础设施：          docker compose up -d
+#   起全部（含应用与网关）：  docker compose --profile full up -d
+#
+# 约束：
+#   1. 镜像版本全部锁定，禁止 latest（TECH_DESIGN 15.1）
+#   2. 密码只从 .env 注入，本文件不出现任何真实凭据
+#   3. Redis 是本项目独立实例（blog-redis），与宿主机其他 Redis 无关
+# ============================================================
+
+name: go-blog
+
+services:
+  mysql:
+    image: mysql:8.0.36
+    container_name: blog-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?必须在 deploy/.env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      MYSQL_USER: ${MYSQL_USER:-blog}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?必须在 deploy/.env 中设置 MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --max-connections=200
+    ports:
+      # 宿主机 3306 常被本地已安装的 MySQL 占用，默认映射到 3307。
+      # 容器网络内应用仍使用 mysql:3306，不受此映射影响。
+      - "${MYSQL_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # 本项目专用的 Redis。不复用、不修改宿主机上已有的 redis 实例。
+  blog-redis:
+    image: redis:7.2.4-alpine
+    container_name: blog-redis
+    restart: unless-stopped
+    environment:
+      # 仅用于容器内 healthcheck 取用，不写入镜像
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?必须在 deploy/.env 中设置 REDIS_PASSWORD}
+    # 用 sh -c 是为了把密码从环境变量传给 redis-server，
+    # 避免密码出现在 compose 文件或镜像层里。
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --appendfsync everysec --requirepass "$$REDIS_PASSWORD"
+    ports:
+      # 宿主机 6379 已被其他实例占用，默认映射到 6380。
+      # 容器网络内应用仍通过 blog-redis:6379 访问。
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: blog-meili
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?必须在 deploy/.env 中设置 MEILI_MASTER_KEY}
+      MEILI_ENV: ${MEILI_ENV:-development}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "${MEILI_HOST_PORT:-7700}:7700"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # MinIO：V1.0 使用本地存储驱动，本服务默认不启动（profile: storage）。
+  # 保留定义供部署阶段启用；启用前必须重新核实镜像 tag 是否仍可匿名拉取。
+  minio:
+    profiles: ["storage"]
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: blog-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_pass_change_me}
+    ports:
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------- 应用层，阶段 1 后启用 ----------------
+  app:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: blog-app
+    restart: unless-stopped
+    environment:
+      BLOG_APP_ENV: production
+      BLOG_APP_ADDR: ":8080"
+      BLOG_APP_VERSION: ${BLOG_APP_VERSION:-dev}
+      # 容器网络内使用服务名，不要用 127.0.0.1
+      BLOG_DB_DSN: "${MYSQL_USER:-blog}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE:-blog}?charset=utf8mb4&parseTime=true&loc=Local"
+      BLOG_REDIS_ADDR: "blog-redis:6379"
+      BLOG_REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      BLOG_REDIS_DB: "0"
+      BLOG_SEARCH_HOST: http://meilisearch:7700
+      BLOG_SEARCH_API_KEY: ${MEILI_MASTER_KEY:?必须在 deploy/.env 中设置 MEILI_MASTER_KEY}
+      BLOG_SEARCH_INDEX: ${BLOG_SEARCH_INDEX:-articles}
+      # 存储驱动：V1.0 用本地磁盘；s3 待部署阶段实现
+      BLOG_STORAGE_DRIVER: ${BLOG_STORAGE_DRIVER:-local}
+      BLOG_JWT_SECRET: ${BLOG_JWT_SECRET:?必须在 deploy/.env 中设置 BLOG_JWT_SECRET}
+      # 容器内写挂载卷，不要落在镜像层
+      BLOG_STORAGE_LOCAL_ROOT: /app/var/storage
+      BLOG_STORAGE_PUBLIC_BASE_URL: ${BLOG_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:8080/api/v1/media}
+      BLOG_STORAGE_MAX_IMAGE_MB: "10"
+    volumes:
+      # 本地存储必须持久化，否则容器重建即丢图
+      - ../var/storage:/app/var/storage
+    ports:
+      - "${APP_HOST_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      blog-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    profiles: ["full"]
+    build:
+      # 前端工程在 web/（不是 apps/web），Dockerfile 也在该目录
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: blog-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # SSR 阶段直连后端（容器网络用服务名）；浏览器侧一律走同域 /api
+      NUXT_PUBLIC_API_UPSTREAM: http://app:8080
+      # 站点对外地址：canonical / OG / sitemap 用；部署时改成真实域名
+      NUXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost}
+      # 留空表示浏览器按当前域名推导 ws(s)://host（生产由 Nginx 代理 /ws）
+      NUXT_PUBLIC_WS_UPSTREAM: ${WS_PUBLIC_UPSTREAM:-}
+    ports:
+      - "${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/robots.txt >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  nginx:
+    profiles: ["full"]
+    image: nginx:1.25.4-alpine
+    container_name: blog-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HOST_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+      - web
+
+volumes:
+  mysql_data:
+  redis_data:
+  meili_data:
+  minio_data:

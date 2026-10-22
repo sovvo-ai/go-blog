@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>概览 · 墨痕管理</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/components.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-menu">
+    <span class="logo">墨痕 · 管理</span>
+    <nav><a class="on" href="/admin/index.html">概览</a><a href="/admin/users.html">用户管理</a><a href="/admin/articles.html">文章审核</a><a href="/admin/comments.html">评论管理</a><a href="/admin/reports.html">举报处理</a><a href="/admin/categories.html">分类</a><a href="/admin/tags.html">标签</a><a href="/admin/media.html">媒体库</a><a href="/admin/settings.html">系统设置</a><a href="/admin/index-status.html">索引状态</a><a href="/admin/logs.html">操作日志</a></nav>
+    <div class="menu-foot">
+      <div class="avatar-dot">管</div>
+      <div><p class="name">admin</p><p class="role">超级管理员</p></div>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-crumb"><span class="page serif">概览</span><span class="crumb-sep">/</span> 站点数据</div>
+    <div class="admin-content"><div class="stat-band">
+      <div class="cell"><p class="label">文章总数</p><p class="num">128</p><p class="delta" style="color:var(--green);">今日 +3</p></div>
+      <div class="cell"><p class="label">用户总数</p><p class="num">56</p><p class="delta" style="color:var(--green);">本周 +5</p></div>
+      <div class="cell warn"><p class="label">待审核</p><p class="num">7</p><p class="delta">文章 5 · 评论 2</p></div>
+      <div class="cell"><p class="label">今日访问</p><p class="num">1,842</p><p class="delta">较昨日 +12%</p></div>
+    </div>
+    <div style="margin-top:20px;border:0.5px solid var(--hairline);padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <p style="margin:0;font-family:var(--serif);font-size:14px;color:var(--ink);">近 14 天发文与访问</p>
+        <div style="display:flex;gap:12px;font-size:11px;color:var(--ink-3);">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:var(--ink);display:inline-block;"></span>发文</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#D3D1C7;display:inline-block;"></span>访问</span>
+        </div>
+      </div>
+      <svg width="100%" height="100" viewBox="0 0 640 100" preserveAspectRatio="none">
+        <path d="M0 80 C60 78 90 62 140 64 S240 34 300 46 S420 24 480 32 S580 16 640 20" fill="none" stroke="#D3D1C7" stroke-width="2"/>
+        <rect x="20" y="74" width="10" height="20" fill="#111827"/><rect x="90" y="70" width="10" height="24" fill="#111827"/>
+        <rect x="160" y="66" width="10" height="28" fill="#111827"/><rect x="230" y="60" width="10" height="34" fill="#111827"/>
+        <rect x="300" y="64" width="10" height="30" fill="#111827"/><rect x="370" y="56" width="10" height="38" fill="#111827"/>
+        <rect x="440" y="62" width="10" height="32" fill="#111827"/><rect x="510" y="50" width="10" height="44" fill="#111827"/>
+        <rect x="580" y="54" width="10" height="40" fill="#111827"/>
+      </svg>
+    </div>
+    <div style="margin-top:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <p style="margin:0;font-family:var(--serif);font-size:14px;color:var(--ink);">待审核文章</p>
+        <span style="font-size:12px;color:var(--ink);border-bottom:0.5px solid var(--ink);"><a href="/admin/articles.html">查看全部 →</a></span>
+      </div>
+      <div style="border-top:0.5px solid var(--hairline);">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 4px;font-size:13px;border-bottom:0.5px solid var(--hairline);">
+          <span style="color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--serif);">单聊消息序号：为什么不用 Redis INCR</span>
+          <span style="font-size:12px;color:var(--ink-4);">阿张 · 2 小时前</span>
+          <a class="link-u" href="/admin/article-detail.html">审核</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 4px;font-size:13px;border-bottom:0.5px solid var(--hairline);">
+          <span style="color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--serif);">Meilisearch 中文分词踩坑记录</span>
+          <span style="font-size:12px;color:var(--ink-4);">阿李 · 3 小时前</span>
+          <a class="link-u" href="/admin/article-detail.html">审核</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 4px;font-size:13px;border-bottom:0.5px solid var(--hairline);">
+          <span style="color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--serif);">Docker Compose 部署完整清单</span>
+          <span style="font-size:12px;color:var(--ink-4);">阿王 · 昨天</span>
+          <a class="link-u" href="/admin/article-detail.html">审核</a>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+</body>
+</html>

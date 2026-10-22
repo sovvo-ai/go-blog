@@ -1,0 +1,16 @@
+{
+  "name": "mohen-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3000",
+    "build": "nuxt build",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^1.0.3",
+    "nuxt": "^3.14.1592",
+    "pinia": "^4.1.0",
+    "vue": "^3.5.13"
+  }
+}
