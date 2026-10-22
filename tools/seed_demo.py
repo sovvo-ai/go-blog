@@ -4,14 +4,30 @@
 前提：后端 8080 在跑，MySQL 可用（用于把注册账号直接置为已验证）。
 """
 import json
+import os
 import subprocess
 import urllib.error
 import urllib.request
 import http.cookiejar
 
-API = 'http://127.0.0.1:8080'
-DB = ['mysql', '-h', '127.0.0.1', '-u', 'root', '-p123456', 'blog', '-e']
-PASSWORD = 'Demo12345'
+API = os.environ.get('BLOG_API', 'http://127.0.0.1:8080')
+
+# 凭据一律从环境变量读取，绝不写进仓库：
+#   MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE
+#   DEMO_PASSWORD  演示账号密码（必填）
+#   ADMIN_PASSWORD 管理员密码（必填，用于审核放行）
+MYSQL_HOST = os.environ.get('MYSQL_HOST', '127.0.0.1')
+MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
+MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', 'blog')
+PASSWORD = os.environ.get('DEMO_PASSWORD', '')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+if not (MYSQL_PASSWORD and PASSWORD and ADMIN_PASSWORD):
+    raise SystemExit('请先设置环境变量：MYSQL_PASSWORD / DEMO_PASSWORD / ADMIN_PASSWORD')
+
+DB = ['mysql', '-h', MYSQL_HOST, '-P', MYSQL_PORT, '-u', MYSQL_USER,
+      f'-p{MYSQL_PASSWORD}', MYSQL_DATABASE, '-e']
 
 ROLE_ID = {'reader': 1, 'author': 2, 'admin': 3}
 
@@ -462,7 +478,8 @@ def ensure_accounts():
 
 
 def uid_of(username: str) -> int:
-    out = subprocess.run(['mysql', '-h', '127.0.0.1', '-u', 'root', '-p123456', 'blog',
+    out = subprocess.run(['mysql', '-h', MYSQL_HOST, '-P', MYSQL_PORT, '-u', MYSQL_USER,
+                          f'-p{MYSQL_PASSWORD}', MYSQL_DATABASE,
                           '-N', '-e', f"SELECT id FROM users WHERE username='{username}';"],
                          capture_output=True, text=True, encoding='utf-8', errors='ignore')
     return int(out.stdout.strip())
@@ -531,7 +548,7 @@ def main():
         clients[username] = c
     demo = Client(); demo.login('demo_writer'); clients['demo_writer'] = demo
     admin = Client()
-    st, _ = admin.login('admin', 'Admin12345')
+    st, _ = admin.login('admin', ADMIN_PASSWORD)
     print(f'  admin 登录 {st}')
     clients['__admin'] = admin
 
